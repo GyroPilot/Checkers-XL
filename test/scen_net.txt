@@ -1,0 +1,17 @@
+60 key meta_l-t
+70 key 1
+80 sq 11
+85 sq 15
+100 key shift-1
+115 key shift-1
+130 key shift-1
+150 key meta_l-e
+170 key ret
+180 key a
+195 key shift-1
+210 key shift-1
+225 key shift-1
+245 key ret
+255 key meta_l-l
+260 sh kill $(cat test/work/server.pid)
+270 key meta_l-t

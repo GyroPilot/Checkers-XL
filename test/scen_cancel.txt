@@ -1,0 +1,7 @@
+75 key meta_l-t
+85 mon sendkey meta_l-dot 600
+100 key meta_l-t
+110 key esc
+125 key q
+130 sq 11
+135 sq 15

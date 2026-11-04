@@ -1,0 +1,17 @@
+60 key meta_l-4
+65 sq 11
+70 sq 15
+85 key meta_l-3
+90 key u
+95 sq 11
+100 sq 15
+115 key meta_l-2
+120 key u
+125 sq 11
+130 sq 15
+145 key meta_l-1
+150 key u
+155 sq 11
+160 sq 15
+175 key meta_l-4
+180 key shift-1
