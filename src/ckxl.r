@@ -116,17 +116,17 @@ resource 'DITL' (133) { {
         "Mouse ... click a piece, then where it goes\r"
         "Arrows, 4 6 8 2 (keypad) or J L I K ... the cursor\r"
         "Return or Space ... pick the cursor square\r"
-        "N ... new game (Command-N)\r"
-        "U ... take back your last move (Command-U)" };
+        "N ... new game (Apple-N)\r"
+        "U ... take back your last move (Apple-U)" };
     { 108, 14, 174, 426 }, StaticText { disabled,
-        "D ... show or hide the dots (Command-D)\r"
+        "D ... show or hide the dots (Apple-D)\r"
         "# ... show or hide the square numbers\r"
         "S ... switch sides: new game, the Mac opens\r"
-        "Command-1 to Command-4 ... the Mac's level" };
+        "Apple-1 to Apple-4 ... the Mac's level" };
     { 176, 14, 276, 426 }, StaticText { disabled,
-        "H ... How to Play (Command-H)\r"
+        "H ... How to Play (Apple-H)\r"
         "At a table: A another game, R look again.\r"
-        "Command-period ... stop (or: move now)" }
+        "Apple-period ... stop (or: move now)" }
 } };
 
 resource 'vers' (1) { 0x00, 0x10, development, 0x02, verUS, "0.1d2", "0.1d2, Checkers XL, Macintosh XL / MacWorks" };

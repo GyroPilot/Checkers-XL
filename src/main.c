@@ -418,7 +418,7 @@ static void DrawPanel(void)
         Text(x, (short)(y + 56), "R looks at the table again.");
     } else {
         Text(x, (short)(y + 28), "N new  U undo  D dots  # numbers");
-        Text(x, (short)(y + 42), "Cmd-1 to 4 level  S switch  H help");
+        Text(x, (short)(y + 42), "Apple-1 to 4 level  S switch  H help");
     }
 }
 
@@ -491,7 +491,7 @@ static void MacTurn(void)                        /* the Mac moves; then it is yo
     CkMove mv;
     short n;
     gThinking = true;
-    Say("The Mac is thinking...  (Command-period: move now)");
+    Say("The Mac is thinking...  (Apple-period: move now)");
     n = Think(gLevel, &mv);
     gThinking = false;
     if (n == 0) { FinishGame(gHuman); return; }  /* the Mac cannot move */
@@ -571,7 +571,7 @@ static Boolean NetAsk(const char *path)
     OSErr err;
     Boolean state = strcmp(path, "/tables") && strcmp(path, "/leave");
     if (!NetReady()) return false;
-    Say("Talking to the checkers server ...  (Command-period stops)");
+    Say("Talking to the checkers server ...  (Apple-period stops)");
     SetCursor(*GetCursor(watchCursor));
     err = CnGet(path, why);
     InitCursor();
