@@ -1,4 +1,4 @@
-/* Checkers XL 0.1d1: American checkers on a Macintosh XL, the Mac XL counterpart of LisaCheckers 1.2, 3 Nov 2026.
+/* Checkers XL 0.1d2: American checkers on a Macintosh XL, the Mac XL counterpart of LisaCheckers 1.2, 3 Nov 2026.
  *
  * Tim, 3 Nov 2026 (through the banana): "Give moof what it needs to make the same or similar library of apps for
  * Mac xL."  This is number 4 of the library (after FujiNet XL), a port of LisaCheckers 1.2 (Lisa Pascal):
@@ -20,7 +20,7 @@
 #include "mailbox.h"
 #include "net.h"
 
-#define kVersion   "Checkers XL 0.1d1"
+#define kVersion   "Checkers XL 0.1d2"
 #define kSettings  "\pCheckers XL Settings"
 
 enum { mApple = 128, mFile, mEdit, mGame, mLevel, mNet };

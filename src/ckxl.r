@@ -60,7 +60,7 @@ resource 'DITL' (128) { {
 resource 'DLOG' (129) { { 50, 26, 280, 486 }, dBoxProc, invisible, noGoAway, 0, 129, "", centerMainScreen };
 resource 'DITL' (129) { {
     { 198, 370, 218, 440 }, Button { enabled, "OK" };
-    { 10, 14, 30, 446 }, StaticText { disabled, "Checkers XL 0.1d1   (test, 3 November 2026)" };
+    { 10, 14, 30, 446 }, StaticText { disabled, "Checkers XL 0.1d2   (test, 4 November 2026)" };
     { 34, 14, 118, 446 }, StaticText { disabled,
         "American checkers on a Macintosh XL: you against the Mac at four levels, or people on other "
         "Lisas, Macs and FujiNet machines through the checkers server (the network game goes through the "
@@ -110,24 +110,26 @@ resource 'DITL' (132) { {
 resource 'ALRT' (133) { { 26, 36, 334, 476 }, 133, { OK, visible, silent; OK, visible, silent; OK, visible, silent; OK, visible, silent }, centerMainScreen };
 resource 'DITL' (133) { {
     { 280, 356, 300, 426 }, Button { enabled, "OK" };
-    { 8, 14, 136, 426 }, StaticText { disabled,
-        "Keys\n"
-        "Mouse ... click a piece, then where it goes\n"
-        "Arrows, 4 6 8 2 (keypad) or J L I K ... the cursor\n"
-        "Return or Space ... pick the cursor square\n"
-        "N ... new game (Command-N)\n"
+    /* 0.1d2: returns (\r) for line breaks (\n shows as a box), and three pieces under 255 characters each */
+    { 8, 14, 106, 426 }, StaticText { disabled,
+        "Keys\r"
+        "Mouse ... click a piece, then where it goes\r"
+        "Arrows, 4 6 8 2 (keypad) or J L I K ... the cursor\r"
+        "Return or Space ... pick the cursor square\r"
+        "N ... new game (Command-N)\r"
         "U ... take back your last move (Command-U)" };
-    { 138, 14, 276, 426 }, StaticText { disabled,
-        "D ... show or hide the dots (Command-D)\n"
-        "# ... show or hide the square numbers\n"
-        "S ... switch sides: new game, the Mac opens\n"
-        "Command-1 to Command-4 ... the Mac's level\n"
-        "H ... How to Play (Command-H)\n"
-        "At a table: A another game, R look again.\n"
+    { 108, 14, 174, 426 }, StaticText { disabled,
+        "D ... show or hide the dots (Command-D)\r"
+        "# ... show or hide the square numbers\r"
+        "S ... switch sides: new game, the Mac opens\r"
+        "Command-1 to Command-4 ... the Mac's level" };
+    { 176, 14, 276, 426 }, StaticText { disabled,
+        "H ... How to Play (Command-H)\r"
+        "At a table: A another game, R look again.\r"
         "Command-period ... stop (or: move now)" }
 } };
 
-resource 'vers' (1) { 0x00, 0x10, development, 0x01, verUS, "0.1d1", "0.1d1, Checkers XL, Macintosh XL / MacWorks" };
+resource 'vers' (1) { 0x00, 0x10, development, 0x02, verUS, "0.1d2", "0.1d2, Checkers XL, Macintosh XL / MacWorks" };
 
 /* a stock XL: 1 MB.  The application wants 160K: 66 KB of code and globals (the search 13 KB), the rest heap and stack. */
 resource 'SIZE' (-1) {
