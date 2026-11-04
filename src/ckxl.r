@@ -60,7 +60,7 @@ resource 'DITL' (128) { {
 resource 'DLOG' (129) { { 50, 26, 280, 486 }, dBoxProc, invisible, noGoAway, 0, 129, "", centerMainScreen };
 resource 'DITL' (129) { {
     { 198, 370, 218, 440 }, Button { enabled, "OK" };
-    { 10, 14, 30, 446 }, StaticText { disabled, "Checkers XL 0.1d2   (test, 4 November 2026)" };
+    { 10, 14, 30, 446 }, StaticText { disabled, "Checkers XL 0.1d3   (test, 4 November 2026)" };
     { 34, 14, 118, 446 }, StaticText { disabled,
         "American checkers on a Macintosh XL: you against the Mac at four levels, or people on other "
         "Lisas, Macs and FujiNet machines through the checkers server (the network game goes through the "
@@ -129,7 +129,7 @@ resource 'DITL' (133) { {
         "Apple-period ... stop (or: move now)" }
 } };
 
-resource 'vers' (1) { 0x00, 0x10, development, 0x02, verUS, "0.1d2", "0.1d2, Checkers XL, Macintosh XL / MacWorks" };
+resource 'vers' (1) { 0x00, 0x10, development, 0x03, verUS, "0.1d3", "0.1d3, Checkers XL, Macintosh XL / MacWorks" };
 
 /* a stock XL: 1 MB.  The application wants 160K: 66 KB of code and globals (the search 13 KB), the rest heap and stack. */
 resource 'SIZE' (-1) {

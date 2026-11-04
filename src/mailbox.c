@@ -182,5 +182,6 @@ void MbErrorText(const char *what, OSErr err, const char *why, char *out)
     if (err == 1) sprintf(out, "%s: no answer in 45 s. Is the mailbox on the ESPFuji drive (firmware 1.1 or later)?", what);
     else if (err == userCanceledErr) sprintf(out, "%s: stopped.", what);
     else if (err == 2) sprintf(out, "%s: %s", what, why);
+    else if (err == fnOpnErr) sprintf(out, "%s: no mailbox. Copy this application to the ESProFile (ESPFuji) volume and open it there; it cannot reach the drive from a server or floppy.", what);   /* -38: no mailbox open (4 Nov 2026) */
     else sprintf(out, "%s: error %d.", what, (int)err);
 }
