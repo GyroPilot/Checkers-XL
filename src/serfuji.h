@@ -11,15 +11,15 @@
 #define SF_PRINTER  1
 
 /* Open the port and find the FujiNet: 19200 baud, then 9600 (the speed that answered last time first).
- * noErr: it answered; where gets "Serial: FujiNet on the Modem Port, 19200 baud."  Else the port is closed again and
+ * noErr: it answered; where gets "Serial: FujiNet on Serial A, 19200 baud."  Else the port is closed again and
  * where says why (port in use by AppleTalk, no answer). */
 OSErr SfOpen(short port, long *baud, char *where);
 void SfClose(void);
 Boolean SfUp(void);
-void SfRouteText(char *out);                /* "the FujiNet on the Modem Port, 19200 baud" */
+void SfRouteText(char *out);                /* "the FujiNet on Serial A, 19200 baud" */
 
 /* The mailbox requests the applications send, answered over FujiBus with the drive's words:
- *   HELLO  -> "FujiNet <firmware> on the Modem Port, 19200 baud: network <ssid>, host <name>, address a.b.c.d"
+ *   HELLO  -> "FujiNet <firmware> on Serial A, 19200 baud: network <ssid>, host <name>, address a.b.c.d"
  *   WIFI   -> "ssid <ssid> status connected ip a.b.c.d" (or "status disconnected")
  *   CLOCK  -> "OK yyyy mm dd hh mi ss"
  *   OPEN <url> -> "OK <bytes> <http code>" or "ERROR ...";  READ <offset> <count> (in order) -> the bytes; echo = offset

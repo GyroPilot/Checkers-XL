@@ -36,7 +36,7 @@ Boolean MbIdle(short ticks);
 #define MB_ESPROFILE  1
 #define MB_MODEM      2
 #define MB_PRINTER    3
-void MbRouteText(char *out);                         /* "the FujiNet on the Modem Port, 19200 baud" */
+void MbRouteText(char *out);                         /* "the FujiNet on Serial A, 19200 baud" */
 void MbRouteMenu(MenuHandle m);                      /* append the route items to a menu (the Network menu) */
 Boolean MbRouteHit(MenuHandle m, short item, char *where);   /* a route item chosen: reopen; where gets the line */
 

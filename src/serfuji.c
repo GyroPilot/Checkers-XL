@@ -40,9 +40,10 @@ static short sConn, sStat;         /* N1: connected flag and status code from th
 
 Boolean SfUp(void) { return sUp; }
 
-static const char *PortName(short p) { return p == SF_PRINTER ? "Printer Port" : "Modem Port"; }
+static const char *PortName(short p) { return p == SF_PRINTER ? "Serial B" : "Serial A"; }   /* the ports' own names (Tim, 6 Nov):
+                                              * under MacWorks Serial A is the Mac modem port (.A), Serial B the printer port (.B) */
 
-void SfRouteText(char *out) { sprintf(out, "the FujiNet on the %s, %ld baud", PortName(sPort), sBaud); }
+void SfRouteText(char *out) { sprintf(out, "the FujiNet on %s, %ld baud", PortName(sPort), sBaud); }
 
 static unsigned char Chk(short n)
 {
@@ -212,8 +213,8 @@ OSErr SfOpen(short port, long *baud, char *where)
     if (err) {
         sIn = sOut = 0;
         if (port == SF_PRINTER)
-            sprintf(where, "Serial: the Printer Port would not open (error %d). Is AppleTalk using it? Turn AppleTalk off in the Chooser, or use the Modem Port.", (int)err);
-        else sprintf(where, "Serial: the Modem Port would not open (error %d).", (int)err);
+            sprintf(where, "Serial: Serial B would not open (error %d). Is AppleTalk set to LocalTalk in the Network control panel? It holds Serial B then.", (int)err);
+        else sprintf(where, "Serial: Serial A would not open (error %d).", (int)err);
         return err;
     }
     SerSetBuf(sIn, sInBuf, sizeof sInBuf);
@@ -227,12 +228,12 @@ OSErr SfOpen(short port, long *baud, char *where)
     }
     if (err == noErr && rc == R_OK) {
         *baud = sBaud;
-        sprintf(where, "Serial: the FujiNet on the %s, %ld baud.", PortName(port), sBaud);
+        sprintf(where, "Serial: the FujiNet on %s, %ld baud.", PortName(port), sBaud);
         return noErr;
     }
     SfClosePort();
-    if (rc == userCanceledErr) { sprintf(where, "Serial: looking for the FujiNet on the %s was stopped.", PortName(port)); return userCanceledErr; }
-    sprintf(where, "Serial: no FujiNet answered on the %s at 19200 or 9600 baud.", PortName(port));
+    if (rc == userCanceledErr) { sprintf(where, "Serial: looking for the FujiNet on %s was stopped.", PortName(port)); return userCanceledErr; }
+    sprintf(where, "Serial: no FujiNet answered on %s at 19200 or 9600 baud.", PortName(port));
     return 1;
 }
 
@@ -331,9 +332,9 @@ OSErr SfTransact(const char *cmd, unsigned char *out, short *outlen, unsigned lo
         if (rc == R_OK && sPl >= 140) {
             const unsigned char *a = sPkt + sOff + 97;
             CfgStr(0, 33, ssid); CfgStr(33, 64, host); CfgStr(125, 15, fw);
-            sprintf(s, "FujiNet %s on the %s, %ld baud: network %s, host %s, address %d.%d.%d.%d",
+            sprintf(s, "FujiNet %s on %s, %ld baud: network %s, host %s, address %d.%d.%d.%d",
                     fw, PortName(sPort), sBaud, ssid, host, a[0], a[1], a[2], a[3]);
-        } else sprintf(s, "FujiNet on the %s, %ld baud: ready", PortName(sPort), sBaud);
+        } else sprintf(s, "FujiNet on %s, %ld baud: ready", PortName(sPort), sBaud);
     } else if (strcmp(cmd, "WIFI") == 0) {
         short st;
         if ((err = Result(Call(DEV_FUJI, 0xFA, 0, 0, 0, NULL, 0, T_REPLY), s, "WIFI")) != noErr) { *outlen = strlen(s); return err; }

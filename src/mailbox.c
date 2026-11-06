@@ -180,7 +180,7 @@ static OSErr MbxFetch(const char *url, char *buf, long max, long *got, long *tot
 
 /* ---- The route: the ESPFuji mailbox or a serial FujiNet (6 Nov 2026) ----
  * One choice for every Mac XL application, kept in "XL FujiNet Settings" in the System Folder: Automatic (the
- * ESProFile when its drive answers HELLO, else a FujiNet on the modem port, then the printer port), or one route. */
+ * ESProFile when its drive answers HELLO, else a FujiNet on Serial A, then Serial B), or one route. */
 #define VIA_MB   0
 #define VIA_SER  1
 static short sVia = VIA_MB, sRoute = MB_AUTO, sMenuBase = -1;
@@ -270,7 +270,7 @@ OSErr MbOpen(char *where)
         SaveRoute();
         return noErr;
     }
-    if (err == noErr) strcat(where, "  (No answer from the drive yet, and no serial FujiNet on either port.)");
+    if (err == noErr) strcat(where, "  (No answer from the drive yet, and no serial FujiNet on Serial A or B.)");
     return err;
 }
 
@@ -294,8 +294,8 @@ void MbRouteMenu(MenuHandle m)
     AppendMenu(m, "\p(-");
     AppendMenu(m, "\pAutomatic Route");
     AppendMenu(m, "\pUse the ESProFile");
-    AppendMenu(m, "\pUse Serial: Modem Port");
-    AppendMenu(m, "\pUse Serial: Printer Port");
+    AppendMenu(m, "\pUse Serial A");
+    AppendMenu(m, "\pUse Serial B");
     LoadOnce();
     CheckRoute();
 }
@@ -327,7 +327,7 @@ void MbErrorText(const char *what, OSErr err, const char *why, char *out)
     if (sVia == VIA_SER) {
         char r[80];
         MbRouteText(r);
-        if (err == 1) { sprintf(out, "%s: no answer from %s in 5 s. Check the cable, then choose the port again in the Network menu.", what, r); return; }
+        if (err == 1) { sprintf(out, "%s: no answer from %s in 5 s. Check the cable, then choose Use Serial A or B again.", what, r); return; }
         if (err == fnOpnErr) { sprintf(out, "%s: no serial FujiNet answered. Check the cable and the port, then choose it again in the Network menu.", what); return; }
     }
 
