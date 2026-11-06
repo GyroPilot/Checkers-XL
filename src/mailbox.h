@@ -30,4 +30,14 @@ void MbBreathe(void);
 /* Idle up to ticks, as a waiting program should (WaitNextEvent with a sleep); true when the user stopped it. */
 Boolean MbIdle(short ticks);
 
+/* The route (6 Nov 2026): the ESPFuji mailbox or an RS-232 FujiNet on a serial port (serfuji.c).  MbOpen picks it from
+ * the choice kept in "XL FujiNet Settings" (System Folder), shared by every Mac XL application. */
+#define MB_AUTO       0
+#define MB_ESPROFILE  1
+#define MB_MODEM      2
+#define MB_PRINTER    3
+void MbRouteText(char *out);                         /* "the FujiNet on the Modem Port, 19200 baud" */
+void MbRouteMenu(MenuHandle m);                      /* append the route items to a menu (the Network menu) */
+Boolean MbRouteHit(MenuHandle m, short item, char *where);   /* a route item chosen: reopen; where gets the line */
+
 #endif

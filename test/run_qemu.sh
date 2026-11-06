@@ -16,6 +16,7 @@
 # ICOUNT=10: one instruction = 1 us of Mac time (QEMU allows no more; a 5 MHz 68000 is about half that speed), to see how long the Mac thinks on an XL.
 # A screenshot every 5 s from 60 s on (the image's PRAM sets 800 x 600; the board and panel are laid out for 512 x 342).
 set -u
+SERARGS=(); if [ -n "${SER:-}" ]; then SIM=/Volumes/RetroDev/src/moof-setup/pcfuji/pcfuji_sim.py; SERARGS=(-serial tcp:127.0.0.1:45900); fi   # SER=1: PCFuji on the modem port, no drive answers
 cd "$(dirname "$0")/.."
 T=/Volumes/RetroDev/src/Retro68-build/toolchain/bin
 Q=/Volumes/RetroDev/emulators/qemu
@@ -41,15 +42,15 @@ SI=":System Folder:Startup Items"
   $T/humount )
 sim=
 if [ -z "${NOSIM:-}" ]; then
-  ~/serialenv/bin/python tools/fujisim.py $W/q.img --log $OUT/fujisim.log --utc-offset 0 ${SLOW:+--slow $SLOW} \
+  ~/serialenv/bin/python ${SIM:-tools/fujisim.py} $W/q.img --log $OUT/fujisim.log --utc-offset 0 ${SLOW:+--slow $SLOW} \
       ${REWRITE:+--rewrite https://lisa-gw1.tailc2f141.ts.net/checkers=http://127.0.0.1:8090} &
-  sim=$!
+  sim=$!; [ -n "${SER:-}" ] && sleep 2
 fi
 /opt/local/bin/qemu-system-m68k -M q800 -m 128 -bios $Q/Q800.ROM -display none -g ${G:-1152x870x8} ${ICOUNT:+-icount shift=$ICOUNT,sleep=off} \
     -drive file=$W/q_pram.img,format=raw,if=mtd \
     -device scsi-hd,scsi-id=0,drive=hd0 \
     -drive file=$W/q.img,format=raw,media=disk,if=none,id=hd0 \
-    -nic user,model=dp83932 \
+    -nic user,model=dp83932 ${SERARGS[@]+"${SERARGS[@]}"} \
     -monitor tcp:127.0.0.1:$PORT,server,nowait > $W/qemu.log 2>&1 &
 pid=$!
 mon() { printf '%s\n' "$1" | nc -w 2 127.0.0.1 $PORT >/dev/null 2>&1; }

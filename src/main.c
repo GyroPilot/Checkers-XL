@@ -20,7 +20,7 @@
 #include "mailbox.h"
 #include "net.h"
 
-#define kVersion   "Checkers XL 1.0"
+#define kVersion   "Checkers XL 1.1d1"
 #define kSettings  "\pCheckers XL Settings"
 
 enum { mApple = 128, mFile, mEdit, mGame, mLevel, mNet };
@@ -509,7 +509,7 @@ static void MacTurn(void)                        /* the Mac moves; then it is yo
 
 static Boolean NetReady(void)                    /* the mailbox, opened at the first network request */
 {
-    char where[120], s[200];
+    char where[300], s[200];
     OSErr err;
     if (MbReady()) return true;
     err = MbOpen(where);
@@ -518,6 +518,7 @@ static Boolean NetReady(void)                    /* the mailbox, opened at the f
         Say(s);
         return false;
     }
+    if (!MbReady()) { Say(where); return false; }   /* 1.1: a serial route chosen, but no FujiNet answered */
     return true;
 }
 
@@ -846,6 +847,7 @@ static void DoMenu(long mi)
         case iAgain: if (gNet) NetAsk("/again"); break;
         case iLook: if (gNet) { gView = vwBoard; NetAsk("/state"); } break;
         case iName: YourName(); break;
+        default: { char w[300]; if (MbRouteHit(GetMenuHandle(mNet), item, w)) Say(w); } break;   /* 1.1: the route */
         }
         break;
     }
@@ -928,6 +930,7 @@ static void Setup(void)
 
     SetMenuBar(GetNewMBar(128));
     AppendResMenu(GetMenuHandle(mApple), 'DRVR');
+    MbRouteMenu(GetMenuHandle(mNet));             /* 1.1: the route items (ESProFile or a serial FujiNet) */
     DrawMenuBar();
 
     gWin = GetNewWindow(128, NULL, (WindowPtr)-1);

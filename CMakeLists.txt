@@ -6,7 +6,7 @@ add_application(CheckersXL
     src/main.c
     src/rules.c
     src/net.c
-    src/mailbox.c
+    src/mailbox.c src/serfuji.c
     src/xlproto.c
     src/ckxl.r
     TYPE "APPL"

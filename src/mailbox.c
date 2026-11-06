@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "xlproto.h"
 #include "mailbox.h"
+#include "serfuji.h"
 
 /* AllocContig: Retro68 has no glue for it, so the trap itself (_Allocate with the contiguous bit, $A210). */
 #pragma parameter __D0 PBAllocContigTrap(__A0)
@@ -16,7 +17,6 @@ pascal OSErr PBAllocContigTrap(ParmBlkPtr pb) M68K_INLINE(0xA210);
 static short sRef = 0;
 static unsigned short sSeq = 0, sNextK = 0;
 
-Boolean MbReady(void) { return sRef != 0; }
 
 static OSErr PageIO(Boolean write, short k, unsigned char *page)
 {
@@ -66,7 +66,7 @@ static OSErr OpenExisting(ConstStr255Param name, short vref)
     return err;
 }
 
-OSErr MbOpen(char *where)
+static OSErr MbxOpen(char *where)
 {
     unsigned char named[] = "\pESPFuji Mailbox", local[] = "\pMAILBOX.DATA";
     HParamBlockRec vp;
@@ -106,9 +106,10 @@ OSErr MbOpen(char *where)
     return noErr;
 }
 
-void MbClose(void) { if (sRef) FSClose(sRef); sRef = 0; }
 
-OSErr MbTransact(const char *cmd, unsigned char *out, short *outlen, unsigned long *echo)
+static long sMbWait = MB_WAIT;           /* ticks a mailbox reply may take (3 s for the HELLO probe at launch) */
+
+static OSErr MbxTransact(const char *cmd, unsigned char *out, short *outlen, unsigned long *echo)
 {
     static unsigned char page[XL_PAGE];
     XLHeader h;
@@ -122,7 +123,7 @@ OSErr MbTransact(const char *cmd, unsigned char *out, short *outlen, unsigned lo
     sNextK = (unsigned short)((sNextK + 1) % MB_PAGES);
     XLBuildPage(page, sSeq, XL_REQUEST, (unsigned short)k, MB_PAGES, (const unsigned char *)cmd, (unsigned short)strlen(cmd));
     if ((err = PageIO(true, k, page)) != noErr) return err;
-    deadline = TickCount() + MB_WAIT;
+    deadline = TickCount() + sMbWait;
     while (TickCount() < deadline) {
         short p = (short)((k + j) % MB_PAGES);   /* the other pages in turn: a cached page comes back stale */
         j = (short)(j % (MB_PAGES - 1) + 1);
@@ -142,7 +143,7 @@ OSErr MbTransact(const char *cmd, unsigned char *out, short *outlen, unsigned lo
     return 1;
 }
 
-OSErr MbFetch(const char *url, char *buf, long max, long *got, long *total, int *code, char *why)
+static OSErr MbxFetch(const char *url, char *buf, long max, long *got, long *total, int *code, char *why)
 {
     unsigned char out[XL_PAYLOAD + 1];
     char cmd[XL_PAYLOAD + 1];
@@ -153,7 +154,7 @@ OSErr MbFetch(const char *url, char *buf, long max, long *got, long *total, int 
     *got = 0; *total = 0; *code = 0; why[0] = 0; buf[0] = 0;
     if (strlen(url) + 5 > XL_PAYLOAD) { strcpy(why, "the address is too long (487 characters at most)"); return 2; }
     sprintf(cmd, "OPEN %s", url);
-    if ((err = MbTransact(cmd, out, &n, NULL)) != noErr) return err;
+    if ((err = MbxTransact(cmd, out, &n, NULL)) != noErr) return err;
     out[n] = 0;
     if (sscanf((const char *)out, "OK %lu %d", &t, code) != 2) {     /* the drive's own words, as the Lisa tools now show */
         if (n > 120) n = 120;
@@ -165,7 +166,7 @@ OSErr MbFetch(const char *url, char *buf, long max, long *got, long *total, int 
         short want = XL_PAYLOAD;
         if ((long)off + want > max - 1) want = (short)(max - 1 - (long)off);
         sprintf(cmd, "READ %lu %d", off, want);
-        if ((err = MbTransact(cmd, out, &n, &echo)) != noErr) break;
+        if ((err = MbxTransact(cmd, out, &n, &echo)) != noErr) break;
         /* 1.1b1 echoes the block number for offset 0; the sequence number proves the reply fresh. */
         if (n <= 0 || (off != 0 && echo != off)) { strcpy(why, "the drive answered out of step"); err = 2; break; }
         memcpy(buf + off, out, n);
@@ -173,12 +174,163 @@ OSErr MbFetch(const char *url, char *buf, long max, long *got, long *total, int 
     }
     buf[off] = 0;
     *got = (long)off;
-    MbTransact("CLOSE", out, &n, NULL);
+    MbxTransact("CLOSE", out, &n, NULL);
     return err;
+}
+
+/* ---- The route: the ESPFuji mailbox or a serial FujiNet (6 Nov 2026) ----
+ * One choice for every Mac XL application, kept in "XL FujiNet Settings" in the System Folder: Automatic (the
+ * ESProFile when its drive answers HELLO, else a FujiNet on the modem port, then the printer port), or one route. */
+#define VIA_MB   0
+#define VIA_SER  1
+static short sVia = VIA_MB, sRoute = MB_AUTO, sMenuBase = -1;
+static long sBaud = 19200;
+static MenuHandle sMenu = NULL;
+static const unsigned char kPrefName[] = "\pXL FujiNet Settings";
+
+static short PrefVol(void)
+{
+    SysEnvRec env;
+    if (SysEnvirons(1, &env) == noErr && env.sysVRefNum) return env.sysVRefNum;
+    return 0;
+}
+
+static void LoadRoute(void)
+{
+    short ref;
+    long n = 8;
+    unsigned char b[8];
+    if (FSOpen(kPrefName, PrefVol(), &ref) != noErr) return;
+    if (FSRead(ref, &n, b) == noErr && n == 8 && b[0] == 'R' && b[1] <= MB_PRINTER) {
+        sRoute = b[1];
+        sBaud = ((long)b[4] << 24) | ((long)b[5] << 16) | ((long)b[6] << 8) | b[7];
+        if (sBaud != 9600 && sBaud != 19200) sBaud = 19200;
+    }
+    FSClose(ref);
+}
+
+static void SaveRoute(void)
+{
+    short ref, v = PrefVol();
+    long n = 8;
+    unsigned char b[8] = { 'R', 0, 0, 0, 0, 0, 0, 0 };
+    b[1] = (unsigned char)sRoute;
+    b[4] = (unsigned char)(sBaud >> 24); b[5] = (unsigned char)(sBaud >> 16); b[6] = (unsigned char)(sBaud >> 8); b[7] = (unsigned char)sBaud;
+    Create(kPrefName, v, 'EFXL', 'pref');
+    if (FSOpen(kPrefName, v, &ref) != noErr) return;
+    SetFPos(ref, fsFromStart, 0);
+    FSWrite(ref, &n, b);
+    SetEOF(ref, 8);
+    FSClose(ref);
+    FlushVol(NULL, v);
+}
+
+static void LoadOnce(void) { static Boolean done = false; if (!done) { LoadRoute(); done = true; } }
+
+Boolean MbReady(void) { return sVia == VIA_SER ? SfUp() : sRef != 0; }
+
+void MbClose(void)
+{
+    if (sRef) FSClose(sRef);
+    sRef = 0;
+    SfClose();
+}
+
+static Boolean DriveAnswers(void)                /* a short HELLO: is an ESPFuji drive behind the mailbox? */
+{
+    unsigned char out[XL_PAYLOAD + 1];
+    short n;
+    OSErr err;
+    sMbWait = 3 * 60;
+    err = MbxTransact("HELLO", out, &n, NULL);
+    sMbWait = MB_WAIT;
+    return err == noErr;
+}
+
+OSErr MbOpen(char *where)
+{
+    char line[200];
+    OSErr err;
+    LoadOnce();
+    MbClose();
+    sVia = VIA_MB;
+    if (sRoute == MB_ESPROFILE) return MbxOpen(where);
+    if (sRoute == MB_MODEM || sRoute == MB_PRINTER) {
+        sVia = VIA_SER;
+        if (SfOpen(sRoute == MB_PRINTER ? SF_PRINTER : SF_MODEM, &sBaud, where) == noErr) SaveRoute();
+        return noErr;                            /* where says what happened; requests say "no FujiNet" until it answers */
+    }
+    err = MbxOpen(where);                        /* Automatic */
+    if (err == noErr && DriveAnswers()) return noErr;
+    if (SfOpen(SF_MODEM, &sBaud, line) == noErr || SfOpen(SF_PRINTER, &sBaud, line) == noErr) {
+        if (sRef) FSClose(sRef);
+        sRef = 0;
+        sVia = VIA_SER;
+        strcpy(where, line);
+        SaveRoute();
+        return noErr;
+    }
+    if (err == noErr) strcat(where, "  (No answer from the drive yet, and no serial FujiNet on either port.)");
+    return err;
+}
+
+void MbRouteText(char *out)
+{
+    if (sVia == VIA_SER) { if (SfUp()) SfRouteText(out); else strcpy(out, "a serial FujiNet (not answering)"); }
+    else strcpy(out, sRef ? "the ESProFile (ESPFuji mailbox)" : "no route");
+}
+
+static void CheckRoute(void)
+{
+    short i;
+    if (!sMenu || sMenuBase < 0) return;
+    for (i = 0; i <= MB_PRINTER; i++) CheckItem(sMenu, sMenuBase + 2 + i, i == sRoute);
+}
+
+void MbRouteMenu(MenuHandle m)
+{
+    sMenu = m;
+    sMenuBase = CountMItems(m);
+    AppendMenu(m, "\p(-");
+    AppendMenu(m, "\pAutomatic Route");
+    AppendMenu(m, "\pUse the ESProFile");
+    AppendMenu(m, "\pUse Serial: Modem Port");
+    AppendMenu(m, "\pUse Serial: Printer Port");
+    LoadOnce();
+    CheckRoute();
+}
+
+Boolean MbRouteHit(MenuHandle m, short item, char *where)
+{
+    if (m != sMenu || sMenuBase < 0 || item < sMenuBase + 2 || item > sMenuBase + 2 + MB_PRINTER) return false;
+    sRoute = item - sMenuBase - 2;
+    SaveRoute();
+    CheckRoute();
+    if (MbOpen(where) != noErr && !where[0]) strcpy(where, "No route: no mailbox and no serial FujiNet.");
+    return true;
+}
+
+OSErr MbTransact(const char *cmd, unsigned char *out, short *outlen, unsigned long *echo)
+{
+    if (sVia == VIA_SER) return SfTransact(cmd, out, outlen, echo);
+    return MbxTransact(cmd, out, outlen, echo);
+}
+
+OSErr MbFetch(const char *url, char *buf, long max, long *got, long *total, int *code, char *why)
+{
+    if (sVia == VIA_SER) return SfFetch(url, buf, max, got, total, code, why);
+    return MbxFetch(url, buf, max, got, total, code, why);
 }
 
 void MbErrorText(const char *what, OSErr err, const char *why, char *out)
 {
+    if (sVia == VIA_SER) {
+        char r[80];
+        MbRouteText(r);
+        if (err == 1) { sprintf(out, "%s: no answer from %s in 5 s. Check the cable, then choose the port again in the Network menu.", what, r); return; }
+        if (err == fnOpnErr) { sprintf(out, "%s: no serial FujiNet answered. Check the cable and the port, then choose it again in the Network menu.", what); return; }
+    }
+
     if (err == 1) sprintf(out, "%s: no answer in 45 s. Is the mailbox on the ESPFuji drive (firmware 1.1 or later)?", what);
     else if (err == userCanceledErr) sprintf(out, "%s: stopped.", what);
     else if (err == 2) sprintf(out, "%s: %s", what, why);
