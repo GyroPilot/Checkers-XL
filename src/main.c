@@ -20,7 +20,7 @@
 #include "mailbox.h"
 #include "net.h"
 
-#define kVersion   "Checkers XL 0.1d3"
+#define kVersion   "Checkers XL 1.0"
 #define kSettings  "\pCheckers XL Settings"
 
 enum { mApple = 128, mFile, mEdit, mGame, mLevel, mNet };
