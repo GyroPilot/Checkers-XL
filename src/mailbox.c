@@ -251,6 +251,7 @@ OSErr MbOpen(char *where)
 {
     char line[400];
     OSErr err;
+    where[0] = 0;                                /* 1.1: callers print where even on errors */
     LoadOnce();
     MbClose();
     sVia = VIA_MB;
@@ -299,17 +300,45 @@ void MbRouteMenu(MenuHandle m)
     AppendMenu(m, "\pUse the ESProFile");
     AppendMenu(m, "\pUse Serial A");
     AppendMenu(m, "\pUse Serial B");
+    AppendMenu(m, "\pMake a New Mailbox");        /* 1.1 (Tim, 7 Nov): clear a damaged MAILBOX.DATA by hand */
     LoadOnce();
     CheckRoute();
 }
 
+/* 1.1 (7 Nov 2026): Make a New Mailbox.  Deletes MAILBOX.DATA beside this application (a half-made or damaged one:
+ * Salvo XL got error -127 on the 2/10) and opens the route again, which makes a fresh one.  An "ESPFuji Mailbox" at the
+ * top of a volume is left alone. */
+static void NewMailbox(char *where)
+{
+    unsigned char local[] = "\pMAILBOX.DATA";
+    short vref;
+    OSErr err, e2;
+    char line[400];
+    MbClose();
+    GetVol(NULL, &vref);
+    err = FSDelete(local, vref);
+    if (err != noErr && err != fnfErr) {
+        sprintf(where, "Make a New Mailbox: MAILBOX.DATA could not be deleted (error %d).  Delete it in the Finder.", (int)err);
+        return;
+    }
+    e2 = MbOpen(line);
+    if (e2 == noErr) sprintf(where, "New mailbox.  %s  (If the drive does not answer now, restart.)", line);
+    else sprintf(where, "Make a New Mailbox: %s (error %d).", line[0] ? line : "no mailbox made", (int)e2);
+}
+
 Boolean MbRouteHit(MenuHandle m, short item, char *where)
 {
-    if (m != sMenu || sMenuBase < 0 || item < sMenuBase + 2 || item > sMenuBase + 2 + MB_PRINTER) return false;
+    OSErr err;
+    if (m != sMenu || sMenuBase < 0) return false;
+    if (item == sMenuBase + 3 + MB_PRINTER) { NewMailbox(where); return true; }
+    if (item < sMenuBase + 2 || item > sMenuBase + 2 + MB_PRINTER) return false;
     sRoute = item - sMenuBase - 2;
     SaveRoute();
     CheckRoute();
-    if (MbOpen(where) != noErr && !where[0]) strcpy(where, "No route: no mailbox and no serial FujiNet.");
+    where[0] = 0;
+    err = MbOpen(where);
+    if (err != noErr && !where[0])
+        sprintf(where, "No route (error %d): no mailbox and no serial FujiNet.  Make a New Mailbox (same menu) starts the mailbox again.", (int)err);
     return true;
 }
 
