@@ -249,7 +249,7 @@ static Boolean DriveAnswers(void)                /* a short HELLO: is an ESPFuji
 
 OSErr MbOpen(char *where)
 {
-    char line[200];
+    char line[400];
     OSErr err;
     LoadOnce();
     MbClose();
@@ -260,7 +260,9 @@ OSErr MbOpen(char *where)
         if (SfOpen(sRoute == MB_PRINTER ? SF_PRINTER : SF_MODEM, &sBaud, where) == noErr) SaveRoute();
         return noErr;                            /* where says what happened; requests say "no FujiNet" until it answers */
     }
+    SF_TRACE("  route: Automatic, the ESProFile mailbox first");
     err = MbxOpen(where);                        /* Automatic */
+    SF_TRACE(err == noErr ? "  route: mailbox open, HELLO to the drive (3 s)" : "  route: no mailbox");
     if (err == noErr && DriveAnswers()) return noErr;
     if (SfOpen(SF_MODEM, &sBaud, line) == noErr || SfOpen(SF_PRINTER, &sBaud, line) == noErr) {
         if (sRef) FSClose(sRef);
@@ -271,6 +273,7 @@ OSErr MbOpen(char *where)
         return noErr;
     }
     if (err == noErr) strcat(where, "  (No answer from the drive yet, and no serial FujiNet on Serial A or B.)");
+    if (strstr(line, "AppleTalk")) strcpy(where, line);   /* the AppleTalk 57 message matters more */
     return err;
 }
 

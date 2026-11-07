@@ -16,7 +16,11 @@
 OSErr SfOpen(short port, long *baud, char *where);
 void SfClose(void);
 Boolean SfUp(void);
-void SfRouteText(char *out);                /* "the FujiNet on Serial A, 19200 baud" */
+void SfRouteText(char *out);
+
+/* 1.1d4: when set, each serial step is shown before it runs (Tim's XL bombed "illegal instruction" at launch). */
+extern void (*gSfTrace)(const char *step);
+#define SF_TRACE(s) do { if (gSfTrace) gSfTrace(s); } while (0)                /* "the FujiNet on Serial A, 19200 baud" */
 
 /* The mailbox requests the applications send, answered over FujiBus with the drive's words:
  *   HELLO  -> "FujiNet <firmware> on Serial A, 19200 baud: network <ssid>, host <name>, address a.b.c.d"

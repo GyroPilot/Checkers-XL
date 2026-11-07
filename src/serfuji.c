@@ -38,6 +38,100 @@ static unsigned char sCmd;         /* its command byte */
 static long sWait;                 /* N1: bytes waiting, from the last STATUS */
 static short sConn, sStat;         /* N1: connected flag and status code from the last STATUS */
 
+void (*gSfTrace)(const char *step) = NULL;
+
+/* 1.1d5: every driver call through a parameter block cleared to zero.  Retro68's glue (OpenDriver, Control, Status,
+ * FSRead...) leaves ioCompletion and the other unused fields as stack garbage.  Apple's ROM ignores them for
+ * synchronous calls, but on Tim's 2/10 MacWorks' own serial driver bombed "illegal instruction" inside OpenDriver for
+ * both .AOut and .BOut (6 Nov 2026), where a Mac Plus ROM (Snow) does not. */
+static OSErr ZOpen(ConstStr255Param name, short *ref)
+{
+    ParamBlockRec pb;
+    OSErr err;
+    memset(&pb, 0, sizeof pb);
+    pb.ioParam.ioNamePtr = (StringPtr)name;
+    pb.ioParam.ioPermssn = fsCurPerm;
+    err = PBOpenSync(&pb);
+    *ref = pb.ioParam.ioRefNum;
+    return err;
+}
+static OSErr ZClose(short ref)
+{
+    ParamBlockRec pb;
+    memset(&pb, 0, sizeof pb);
+    pb.ioParam.ioRefNum = ref;
+    return PBCloseSync(&pb);
+}
+static OSErr ZControl(short ref, short code, const void *param, short n)
+{
+    ParamBlockRec pb;
+    memset(&pb, 0, sizeof pb);
+    pb.cntrlParam.ioCRefNum = ref;
+    pb.cntrlParam.csCode = code;
+    if (param && n) memcpy(pb.cntrlParam.csParam, param, n);
+    return PBControlSync(&pb);
+}
+static OSErr ZStatus(short ref, short code, void *out, short n)
+{
+    ParamBlockRec pb;
+    OSErr err;
+    memset(&pb, 0, sizeof pb);
+    pb.cntrlParam.ioCRefNum = ref;
+    pb.cntrlParam.csCode = code;
+    err = PBStatusSync(&pb);
+    if (err == noErr && out && n) memcpy(out, pb.cntrlParam.csParam, n);
+    return err;
+}
+static OSErr ZRW(Boolean wr, short ref, long *count, void *buf)
+{
+    ParamBlockRec pb;
+    OSErr err;
+    memset(&pb, 0, sizeof pb);
+    pb.ioParam.ioRefNum = ref;
+    pb.ioParam.ioBuffer = (Ptr)buf;
+    pb.ioParam.ioReqCount = *count;
+    pb.ioParam.ioPosMode = fsAtMark;
+    err = wr ? PBWriteSync(&pb) : PBReadSync(&pb);
+    *count = pb.ioParam.ioActCount;
+    return err;
+}
+static OSErr ZGetBuf(short ref, long *n) { return ZStatus(ref, 2, n, 4); }                 /* SerGetBuf */
+static OSErr ZReset(short ref, short cfg) { return ZControl(ref, 8, &cfg, 2); }            /* SerReset */
+static OSErr ZSetBuf(short ref, Ptr p, short len)                                          /* SerSetBuf */
+{
+    unsigned char b[6];
+    memcpy(b, &p, 4); memcpy(b + 4, &len, 2);
+    return ZControl(ref, 9, b, 6);
+}
+static OSErr ZHShake(short ref, const SerShk *shk) { return ZControl(ref, 10, shk, sizeof *shk); }   /* SerHShake */
+
+static Boolean OptionDown(void)                  /* Option held while choosing Use Serial A/B: skip the AppleTalk check */
+{
+    unsigned char k[16];
+    GetKeys(k);
+    return (k[7] & 0x04) != 0;   /* key code 0x3A */
+}
+
+/* 7 Nov 2026: on Tim's Lisa 2/10 (MacWorks Plus II v2.5.0 Pro, System 6.0.8) EVERY program that opened a serial
+ * port bombed "illegal instruction" (FujiNet XL and Apple's MacTerminal) while the System Folder held the file
+ * "AppleTalk" (AppleTalk 57.0.4, put there by the Asante EN/SC installer); moved out, the ports work.  MacWorks Plus
+ * II supports AppleTalk only up to V52.  System 7.5.5 has no such file (AppleTalk is in the System) and works.  So on
+ * System 6 a type-ZSYS file named "AppleTalk" in the System Folder stops the open with a message instead of a bomb.
+ * The file is only looked at (GetFInfo), never opened. */
+static Boolean AppleTalkFileInSys6(void)
+{
+    SysEnvRec env;
+    HParamBlockRec pb;
+    static unsigned char name[] = "\pAppleTalk";
+    if (SysEnvirons(1, &env) != noErr || env.systemVersion >= 0x0700) return false;
+    memset(&pb, 0, sizeof pb);
+    pb.fileParam.ioNamePtr = name;
+    pb.fileParam.ioVRefNum = env.sysVRefNum;
+    pb.fileParam.ioFDirIndex = 0;
+    if (PBGetFInfoSync((ParmBlkPtr)&pb) != noErr) return false;
+    return pb.fileParam.ioFlFndrInfo.fdType == 'ZSYS';
+}
+
 Boolean SfUp(void) { return sUp; }
 
 static const char *PortName(short p) { return p == SF_PRINTER ? "Serial B" : "Serial A"; }   /* the ports' own names (Tim, 6 Nov):
@@ -62,9 +156,9 @@ static short DescSize(unsigned char d)
 static void Flush(void)
 {
     long n = 0;
-    while (SerGetBuf(sIn, &n) == noErr && n > 0) {
+    while (ZGetBuf(sIn, &n) == noErr && n > 0) {
         if (n > (long)sizeof sWire) n = sizeof sWire;
-        FSRead(sIn, &n, sWire);
+        ZRW(false, sIn, &n, sWire);
     }
 }
 
@@ -90,7 +184,7 @@ static short Send(unsigned char dev, unsigned char cmd, unsigned char desc, unsi
     }
     sWire[w++] = 0xC0;
     count = w;
-    if (FSWrite(sOut, &count, sWire) != noErr || count != w) return R_PORT;
+    if (ZRW(true, sOut, &count, sWire) != noErr || count != w) return R_PORT;
     return R_OK;
 }
 
@@ -107,10 +201,10 @@ static short Recv(long firstTicks)
     sLen = 0; sOff = 6; sPl = 0; sCmd = 0;
     while (!done) {
         avail = 0;
-        if (SerGetBuf(sIn, &avail) != noErr) return R_PORT;
+        if (ZGetBuf(sIn, &avail) != noErr) return R_PORT;
         if (avail > 0) {
             got = avail > 128 ? 128 : avail;
-            if (FSRead(sIn, &got, sWire) != noErr && got <= 0) return R_PORT;
+            if (ZRW(false, sIn, &got, sWire) != noErr && got <= 0) return R_PORT;
             for (i = 0; i < got && !done; i++) {
                 unsigned char b = sWire[i];
                 if (b == 0xC0) {
@@ -174,8 +268,8 @@ static void Kill(short ref)                       /* KillIO: Retro68 has no glue
 
 static void SfClosePort(void)
 {
-    if (sIn) { SerSetBuf(sIn, NULL, 0); Kill(sIn); CloseDriver(sIn); }
-    if (sOut) { Kill(sOut); CloseDriver(sOut); }
+    if (sIn) { SF_TRACE("  serial: SerSetBuf off, KillIO, close (in)"); ZSetBuf(sIn, NULL, 0); Kill(sIn); ZClose(sIn); }
+    if (sOut) { SF_TRACE("  serial: KillIO, close (out)"); Kill(sOut); ZClose(sOut); }
     sIn = sOut = 0; sUp = false; sOpen = false;
 }
 
@@ -191,10 +285,12 @@ static OSErr SetSpeed(long baud)
     short cfg = (baud == 19200 ? baud19200 : baud9600) + data8 + stop10 + noParity;
     OSErr err;
     memset(&shk, 0, sizeof shk);                 /* no handshake, no XON/XOFF: FujiBus frames carry any byte */
-    if ((err = SerReset(sOut, cfg)) != noErr) return err;
-    SerReset(sIn, cfg);
-    SerHShake(sOut, &shk);
-    SerHShake(sIn, &shk);
+    SF_TRACE(baud == 19200 ? "  serial: SerReset 19200 8N1" : "  serial: SerReset 9600 8N1");
+    if ((err = ZReset(sOut, cfg)) != noErr) return err;
+    ZReset(sIn, cfg);
+    SF_TRACE("  serial: SerHShake none");
+    ZHShake(sOut, &shk);
+    ZHShake(sIn, &shk);
     sBaud = baud;
     return noErr;
 }
@@ -208,8 +304,16 @@ OSErr SfOpen(short port, long *baud, char *where)
 
     SfClose();
     sPort = port;
-    err = OpenDriver(port == SF_PRINTER ? prOut : modemOut, &sOut);
-    if (err == noErr) err = OpenDriver(port == SF_PRINTER ? prIn : modemIn, &sIn);
+    if (AppleTalkFileInSys6() && !OptionDown()) {
+        sprintf(where, "Serial: not opened.  The System Folder holds \"AppleTalk\" (AppleTalk 57, from an Ethernet "
+                "installer), which makes serial programs bomb under MacWorks.  Move it out and restart.  Option + Use "
+                "Serial %s tries anyway.", port == SF_PRINTER ? "B" : "A");
+        return 2;
+    }
+    SF_TRACE(port == SF_PRINTER ? "  serial: open .BOut" : "  serial: open .AOut");
+    err = ZOpen(port == SF_PRINTER ? prOut : modemOut, &sOut);
+    SF_TRACE(port == SF_PRINTER ? "  serial: open .BIn" : "  serial: open .AIn");
+    if (err == noErr) err = ZOpen(port == SF_PRINTER ? prIn : modemIn, &sIn);
     if (err) {
         sIn = sOut = 0;
         if (port == SF_PRINTER)
@@ -217,12 +321,14 @@ OSErr SfOpen(short port, long *baud, char *where)
         else sprintf(where, "Serial: Serial A would not open (error %d).", (int)err);
         return err;
     }
-    SerSetBuf(sIn, sInBuf, sizeof sInBuf);
+    SF_TRACE("  serial: SerSetBuf 4 KB");
+    ZSetBuf(sIn, sInBuf, sizeof sInBuf);
     sUp = true;
     tries[0] = (*baud == 9600) ? 9600 : 19200;
     tries[1] = tries[0] == 9600 ? 19200 : 9600;
     for (i = 0; i < 2; i++) {
         if ((err = SetSpeed(tries[i])) != noErr) break;
+        SF_TRACE("  serial: send ready (70/00), wait 1.5 s");
         rc = Ready(T_PROBE);
         if (rc == R_OK || rc == userCanceledErr) break;
     }
@@ -233,7 +339,8 @@ OSErr SfOpen(short port, long *baud, char *where)
     }
     SfClosePort();
     if (rc == userCanceledErr) { sprintf(where, "Serial: looking for the FujiNet on %s was stopped.", PortName(port)); return userCanceledErr; }
-    sprintf(where, "Serial: no FujiNet answered on %s at 19200 or 9600 baud.", PortName(port));
+    sprintf(where, "Serial: no FujiNet answered on %s at 19200 or 9600 baud.  Is it on, on that port, and set to 19200 or "
+            "9600 baud on its web page (it comes set to 115200, which MacWorks cannot run)?", PortName(port));
     return 1;
 }
 
