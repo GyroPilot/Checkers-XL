@@ -322,7 +322,9 @@ static void NewMailbox(char *where)
         return;
     }
     e2 = MbOpen(line);
-    if (e2 == noErr) sprintf(where, "New mailbox.  %s  (If the drive does not answer now, restart.)", line);
+    /* 1.1: over serial the mailbox is not used, so say so instead of naming the serial route as if it were the drive */
+    if (e2 == noErr && sVia == VIA_SER) sprintf(where, "New mailbox made beside the application; only the ESProFile route uses it.  %s", line);
+    else if (e2 == noErr) sprintf(where, "New mailbox.  %s  (If the drive does not answer now, restart.)", line);
     else sprintf(where, "Make a New Mailbox: %s (error %d).", line[0] ? line : "no mailbox made", (int)e2);
 }
 
@@ -359,7 +361,7 @@ void MbErrorText(const char *what, OSErr err, const char *why, char *out)
     if (sVia == VIA_SER) {
         char r[80];
         MbRouteText(r);
-        if (err == 1) { sprintf(out, "%s: no answer from %s in 5 s. Check the cable, then choose Use Serial A or B again.", what, r); return; }
+        if (err == 1) { sprintf(out, "%s: no answer from %s in 5 s. Check the cable, and that the FujiNet has firmware v1.6.1 or later.", what, r); return; }
         if (err == fnOpnErr) { sprintf(out, "%s: no serial FujiNet answered. Check the cable and the port, then choose it again in the Network menu.", what); return; }
     }
 
